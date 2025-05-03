@@ -11,29 +11,26 @@ from solution.solution import solve
 arg = None
 
 def read_xy_console():
+    print("Вводите значения X и Y через пробел. Например:\nX: 1 2 3\nY: 4 5 6")
     while True:
         try:
-            n = int(input("Сколько точек (минимум 2)? ").strip())
-            if n < 2:
-                raise ValueError("Количество точек должно быть не менее 2.")
-            break
-        except ValueError as e:
-            print(f"Ошибка: {e}")
+            x_raw = input("Введите значения X: ").strip().split()
+            x_vals = [float(v.replace(",", ".")) for v in x_raw]
 
-    def read_column(name):
-        values = []
-        while len(values) < n:
-            raw = input(f"Введите значения {name} ({len(values)}/{n}): ").strip().split()
-            try:
-                floats = [float(v.replace(",", ".")) for v in raw]
-                values.extend(floats)
-            except ValueError:
-                print("Ошибка: все значения должны быть числами.")
-        return values[:n]
+            y_raw = input("Введите значения Y: ").strip().split()
+            y_vals = [float(v.replace(",", ".")) for v in y_raw]
 
-    x_vals = read_column("X")
-    y_vals = read_column("Y")
-    return x_vals, y_vals
+            if len(x_vals) != len(y_vals):
+                print(f"Ошибка: количество X ({len(x_vals)}) не совпадает с количеством Y ({len(y_vals)}). Попробуйте снова.")
+                continue
+
+            if len(x_vals) < 2:
+                print("Ошибка: нужно минимум 2 точки.")
+                continue
+
+            return x_vals, y_vals
+        except ValueError:
+            print("Ошибка: все значения должны быть числами. Попробуйте снова.")
 
 def process_output(x_vals, y_vals, result):
     output = ""
