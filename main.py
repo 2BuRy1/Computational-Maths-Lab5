@@ -1,100 +1,57 @@
 import sys
 import threading
 import os
-import numpy as np
-import matplotlib.pyplot as plt
 from file_manager import file_reader
-from gui_manager.gui_manager import start
-#from gui_manager.gui_manager import plot_function
+from gui_manager.gui_manager import (
+    start, plot_function, get_frame_plot,
+    get_func_combobox, get_input_mode
+)
+from solution.solution import solve
 
+arg = None
 
 def read_xy_console():
     while True:
         try:
-            n = int(input("Сколько точек (8–11)? ").strip())
-            if not 8 <= n <= 11:
-                raise ValueError("Количество точек должно быть от 8 до 11.")
+            n = int(input("Сколько точек (минимум 2)? ").strip())
+            if n < 2:
+                raise ValueError("Количество точек должно быть не менее 2.")
             break
         except ValueError as e:
             print(f"Ошибка: {e}")
 
     def read_column(name):
-        while True:
-            raw = input(f"Введите {n} чисел для {name} через пробел: ").strip().split()
+        values = []
+        while len(values) < n:
+            raw = input(f"Введите значения {name} ({len(values)}/{n}): ").strip().split()
             try:
-                if len(raw) != n:
-                    raise ValueError(f"Нужно ровно {n} значений.")
-                return [float(v.replace(",", ".")) for v in raw]
-            except ValueError as e:
-                print(f"Ошибка: {e}")
+                floats = [float(v.replace(",", ".")) for v in raw]
+                values.extend(floats)
+            except ValueError:
+                print("Ошибка: все значения должны быть числами.")
+        return values[:n]
 
     x_vals = read_column("X")
     y_vals = read_column("Y")
     return x_vals, y_vals
 
-
-def process_output(x_vals, y_vals, results):
-    best_method = None
-    best_rmse = float('inf')
-
+def process_output(x_vals, y_vals, result):
     output = ""
-    for method, data in results.items():
-        if data is None:
-            output += f"Метод: {method} — невозможно аппроксимировать (некорректные значения)\n"
-            output += "-" * 60 + "\n"
-            continue
+    output += result['Таблица конечных разностей'] + "\n"
+    output += f"Ньютон({arg}) = {result['Интерполяция Ньютона']}\n"
+    output += f"Лагранж({arg}) = {result['Интерполяция Лагранжа']}\n"
 
-        coeffs, equation, phi_array, epsilons, rmse, r_squared, interpretation, *rest = data
+    print("\nРезультат:\n", output)
 
-        output += f"Метод: {method}\n"
-        output += f"Уравнение: {equation}\n"
-        output += f"RMSE: {rmse:.4f}\n"
-        output += f"R²: {r_squared:.4f} — {interpretation}\n"
+    plot_function(
+        x_vals, y_vals, result, arg,
+        get_frame_plot(),
+        get_func_combobox().get() if get_input_mode().get() == "function" else None
+    )
 
-        if method == "Линейная":
-            pearson, pearson_interp = rest
-            output += f"Коэфф. Пирсона: {pearson:.4f} — {pearson_interp}\n"
-
-        output += "-" * 60 + "\n"
-
-        if rmse < best_rmse:
-            best_rmse = rmse
-            best_method = method
-
-    if best_method:
-        output += f"\nРекомендуемый метод: {best_method} (наименьший RMSE = {best_rmse:.4f})\n"
-
-    while True:
-        try:
-            out_m = get_valid_input(
-                "\nВыберите способ вывода (1 - консоль, 2 - файл): ",
-                lambda v: v if v in ("1", "2") else ValueError())
-            if out_m == "1":
-                plot_function(x_vals, y_vals, results)
-                print("\nРезультат:\n", output)
-
-            else:
-                while True:
-                    fname = input("Имя файла: ").strip()
-                    if not fname:
-                        print("Имя не может быть пустым.")
-                        continue
-                    try:
-                        with open(fname, "w", encoding="utf-8") as f:
-                            f.write(str(output))
-                        print(f"Сохранено в {fname}")
-                        break
-                    except Exception as e:
-                        print(f"Ошибка записи: {e}")
-
-            ask_for_leave = input("Хотите выйти из приложения? Напишите exit:")
-
-            if ask_for_leave == "exit":
-                os._exit(0)
-            break
-        except Exception as e:
-            print(f"Ошибка: {e}")
-
+    ask_for_leave = input("Хотите выйти из приложения? Напишите exit: ")
+    if ask_for_leave.lower() == "exit":
+        os._exit(0)
 
 def get_valid_input(prompt, validate):
     while True:
@@ -105,7 +62,6 @@ def get_valid_input(prompt, validate):
             return validate(v)
         except ValueError as e:
             print(f"Ошибка ввода: {e}")
-
 
 def console_input():
     while True:
@@ -121,22 +77,78 @@ def process_console_solution():
     while True:
         try:
             x_values, y_values = read_xy_console()
-
-            results = solver.calculate_interpolations(x_values, y_values)
-
-
-            process_output(x_values, y_values ,results)
-
-
-
+            global arg
+            while True:
+                try:
+                    arg = float(input("Введите аргумент для интерполяции: "))
+                    break
+                except ValueError as e:
+                    print(f"Ошибка: {e}")
+            result = solve(x_values, y_values, arg)
+            process_output(x_values, y_values, result)
             break
-
         except Exception as e:
             print(f"Ошибка: {e}. Попробуйте снова.")
 
+def process_function_mode():
+    from gui_manager.gui_manager import FUNCTIONS
+    print("\nДоступные функции:")
+    for name in FUNCTIONS:
+        print("-", name)
 
+    func = None
+    while func is None:
+        fname = input("Выберите функцию по имени: ").strip()
+        if fname in FUNCTIONS:
+            get_func_combobox().set(fname)
+            func = FUNCTIONS[fname]
+        else:
+            print("Неверное имя функции. Попробуйте снова.")
 
+    while True:
+        try:
+            start_val = input("Начало интервала: ").strip()
+            start = float(start_val)
+            break
+        except ValueError:
+            print(f"Ошибка: '{start_val}' не является числом.")
 
+    while True:
+        try:
+            end_val = input("Конец интервала: ").strip()
+            end = float(end_val)
+            if end <= start:
+                print("Ошибка: конец должен быть больше начала.")
+                continue
+            break
+        except ValueError:
+            print(f"Ошибка: '{end_val}' не является числом.")
+
+    while True:
+        try:
+            count_val = input("Количество точек (не менее 2): ").strip()
+            count = int(count_val)
+            if count < 2:
+                print("Ошибка: минимум 2 точки.")
+                continue
+            break
+        except ValueError:
+            print(f"Ошибка: '{count_val}' не является целым числом.")
+
+    while True:
+        try:
+            arg_val = input("Введите аргумент для интерполяции: ").strip()
+            global arg
+            arg = float(arg_val)
+            break
+        except ValueError:
+            print(f"Ошибка: '{arg_val}' не является числом.")
+
+    x_vals = [start + i * (end - start) / (count - 1) for i in range(count)]
+    y_vals = [func(x) for x in x_vals]
+    result = solve(x_vals, y_vals, arg)
+    get_input_mode().set("function")
+    process_output(x_vals, y_vals, result)
 
 def main():
     while True:
@@ -144,16 +156,16 @@ def main():
         if method == "1":
             while True:
                 try:
-                    x_vals, y_vals = file_reader.read_input_from_file()
-                    result = solver.calculate_interpolations(x_vals, y_vals)
+                    x_vals, y_vals, arg = file_reader.read_input_from_file()
+                    result = solve(x_vals, y_vals, arg)
                     process_output(x_vals, y_vals, result)
                     break
                 except Exception as e:
                     print(f"Ошибка файла: {e}")
-        else:
+        elif method == "2":
             console_input()
-
-
+        elif method == "3":
+            process_function_mode()
 
 if __name__ == "__main__":
     threading.Thread(target=main, daemon=True).start()

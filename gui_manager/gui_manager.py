@@ -3,7 +3,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
-from solution.solution import solve
+from solution.solution import solve, newton_poly, lagrange_poly
 
 x_values = []
 y_values = []
@@ -17,8 +17,37 @@ FUNCTIONS = {
     "Квадратичная": lambda x: x ** 2 - 2 * x + 1,
     "Синус": lambda x: math.sin(x),
     "Экспонента": lambda x: math.exp(x),
-    "Логарифм": lambda x: math.log(x + 1)
 }
+
+def plot_function(x_vals, y_vals, result, arg, master_frame, func_name=None):
+    for w in master_frame.winfo_children():
+        w.destroy()
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.grid(True)
+    ax.set_title("Графики: функция, интерполяции и узлы")
+
+    ax.scatter(x_vals, y_vals, color='black', label='Узлы интерполяции')
+
+    x_dense = [x_vals[0] + i * (x_vals[-1] - x_vals[0]) / 500 for i in range(501)]
+
+    y_interp = newton_poly(result['x_sorted'], result['y_sorted'], result['diff_table'], x_dense)
+    y_lagr = lagrange_poly(result['x_sorted'], result['y_sorted'], x_dense)
+
+    ax.plot(x_dense, y_interp, label='Полином Ньютона', color='red', linewidth=2)
+    ax.plot(x_dense, y_lagr, label='Полином Лагранжа', color='green', linestyle='--', linewidth=2)
+
+    if func_name and func_name in FUNCTIONS:
+        f = FUNCTIONS[func_name]
+        y_true = [f(x) for x in x_dense]
+        ax.plot(x_dense, y_true, label='Исходная функция', color='blue')
+
+    ax.legend()
+
+    canvas = FigureCanvasTkAgg(fig, master=master_frame)
+    canvas.draw()
+    canvas.get_tk_widget().pack(fill="both", expand=True)
+    NavigationToolbar2Tk(canvas, master_frame)
 
 def add_column_set():
     global column_sets, entries_x, entries_y
@@ -100,6 +129,7 @@ def show_function_input():
     tk.Label(frame_function_input, text="Аргумент:").grid(row=4, column=0)
     arg_entry = tk.Entry(frame_function_input, width=10)
     arg_entry.grid(row=4, column=1)
+
 def get_input_data():
     global x_values, y_values
     x_values = []
@@ -154,6 +184,16 @@ def get_input_data():
 
     return x_values, y_values, arg
 
+
+def get_frame_plot():
+    return frame_plot
+
+def get_input_mode():
+    return input_mode
+
+def get_func_combobox():
+    return func_combobox
+
 def setData():
     data = get_input_data()
     if data[0] is None:
@@ -161,7 +201,11 @@ def setData():
     x_vals, y_vals, arg = data
     result = solve(x_vals, y_vals, arg)
     result_text.delete("1.0", tk.END)
-    result_text.insert(tk.END, f"Результаты интерполяции:\nНьютон: {result['Интерполяция Ньютона']}\nЛагранж: {result['Интерполяция Лагранжа']}")
+    result_text.insert("1.0", result['Таблица конечных разностей'] + "\n")
+    result_text.insert(tk.END, f"Результаты интерполяции:\nНьютон({arg}) = {result['Интерполяция Ньютона']}\nЛагранж({arg}) = {result['Интерполяция Лагранжа']}\n")
+
+    func_name = func_combobox.get() if input_mode.get() == "function" else None
+    plot_function(x_vals, y_vals, result, arg, frame_plot, func_name)
 
 def start():
     global root, input_frame, frame_plot, result_text, add_column_button
@@ -170,7 +214,7 @@ def start():
 
     root = tk.Tk()
     root.title("Интерполяция")
-    root.geometry("1200x800")
+    root.geometry("1000x700")
 
     input_mode = tk.StringVar(value="table")
 
@@ -180,7 +224,7 @@ def start():
     tk.Radiobutton(mode_frame, text="Функция", variable=input_mode, value="function", command=show_function_input).pack(side=tk.LEFT, padx=5)
 
     input_frame = tk.Frame(root)
-    input_frame.pack(pady=10)
+    input_frame.pack(pady=5)
 
     frame_table_input = tk.Frame(input_frame)
     frame_table_input.pack()
@@ -191,9 +235,6 @@ def start():
     end_entry = tk.Entry(frame_function_input, width=10)
     points_entry = tk.Entry(frame_function_input, width=10)
 
-    frame_plot = tk.Frame(root)
-    frame_plot.pack(pady=10, fill="both", expand=True)
-
     frame_controls = tk.Frame(root)
     frame_controls.pack(pady=10)
 
@@ -202,6 +243,9 @@ def start():
 
     result_text = tk.Text(frame_controls, height=10, width=80, wrap="word")
     result_text.pack()
+
+    frame_plot = tk.Frame(root)
+    frame_plot.pack(pady=5, fill="both", expand=True)
 
     show_table_input()
     root.mainloop()
