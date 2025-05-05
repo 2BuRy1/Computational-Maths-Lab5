@@ -1,9 +1,11 @@
 import math
 import tkinter as tk
+from random import random
 from tkinter import ttk, messagebox
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
-from solution.solution import solve, newton_poly, lagrange_poly
+from solution.solution import solve, newton_divided_interp, divided_differences
 
 x_values = []
 y_values = []
@@ -14,9 +16,7 @@ MAX_COLUMN_SETS = 5
 
 FUNCTIONS = {
     "Линейная": lambda x: 2 * x + 3,
-    "Квадратичная": lambda x: x ** 2 - 2 * x + 1,
     "Синус": lambda x: math.sin(x),
-    "Экспонента": lambda x: math.exp(x),
 }
 
 def plot_function(x_vals, y_vals, result, arg, master_frame, func_name=None):
@@ -31,11 +31,19 @@ def plot_function(x_vals, y_vals, result, arg, master_frame, func_name=None):
 
     x_dense = [x_vals[0] + i * (x_vals[-1] - x_vals[0]) / 500 for i in range(501)]
 
-    y_interp = newton_poly(result['x_sorted'], result['y_sorted'], result['diff_table'], x_dense)
-    y_lagr = lagrange_poly(result['x_sorted'], result['y_sorted'], x_dense)
+    y_interp = newton_divided_poly(result['x_sorted'], result['y_sorted'], x_dense)
+
+    y_gaus = lagrange_poly(result['x_sorted'], result['y_sorted'] ,x_dense)
+
+
+
 
     ax.plot(x_dense, y_interp, label='Полином Ньютона', color='red', linewidth=2)
-    ax.plot(x_dense, y_lagr, label='Полином Лагранжа', color='green', linestyle='--', linewidth=2)
+    ax.plot(x_dense, y_gaus, label='Полином Гаусса', color='green', linestyle='--', linewidth=2)
+
+
+
+
 
     if func_name and func_name in FUNCTIONS:
         f = FUNCTIONS[func_name]
@@ -130,6 +138,7 @@ def show_function_input():
     arg_entry = tk.Entry(frame_function_input, width=10)
     arg_entry.grid(row=4, column=1)
 
+
 def get_input_data():
     global x_values, y_values
     x_values = []
@@ -177,13 +186,14 @@ def get_input_data():
             messagebox.showerror("Ошибка", "Неверный интервал или количество точек")
             return None, None, None
 
-        step = (end - start) / (num - 1)
         func = FUNCTIONS[func_name]
-        x_values = [start + i * step for i in range(num)]
+
+        x_values = np.linspace(start, end, num, endpoint=True).tolist()
         y_values = [func(x) for x in x_values]
 
-    return x_values, y_values, arg
 
+
+    return x_values, y_values, arg
 
 def get_frame_plot():
     return frame_plot
@@ -202,10 +212,70 @@ def setData():
     result = solve(x_vals, y_vals, arg)
     result_text.delete("1.0", tk.END)
     result_text.insert("1.0", result['Таблица конечных разностей'] + "\n")
-    result_text.insert(tk.END, f"Результаты интерполяции:\nНьютон({arg}) = {result['Интерполяция Ньютона']}\nЛагранж({arg}) = {result['Интерполяция Лагранжа']}\n")
+    result_text.insert(tk.END, f"Результаты интерполяции:\nНьютон({arg}) = {result['Интерполяция Ньютона']}\nГаусс({arg}) = {result['Интерполяция Гаусса']}\nЛагранж({arg}) = {result['Интерполяция Лагранжа']}")
 
     func_name = func_combobox.get() if input_mode.get() == "function" else None
     plot_function(x_vals, y_vals, result, arg, frame_plot, func_name)
+
+
+
+
+def lagrange_poly(x_vals, y_vals, x_dense):
+    def L(i, x):
+        result = 1
+        for j in range(len(x_vals)):
+            if j != i:
+                result *= (x - x_vals[j]) / (x_vals[i] - x_vals[j])
+        return result
+
+    y_interp = []
+    for x in x_dense:
+        y = sum(y_vals[i] * L(i, x) for i in range(len(x_vals)))
+        y_interp.append(y)
+    return y_interp
+
+def newton_divided_poly(x, y, x_dense):
+    div_table = divided_differences(x, y)
+    y_interp = [newton_divided_interp(x, div_table, val) for val in x_dense]
+    return y_interp
+
+
+def gauss_poly(x_vals, y_vals, diff_table, x_dense):
+    n = len(x_vals)
+    if n < 2:
+        return [y_vals[0]] * len(x_dense)
+
+    h = x_vals[1] - x_vals[0]
+
+
+    center_idx = n // 2
+    y_interp = []
+
+    for x in x_dense:
+        t = (x - x_vals[center_idx]) / h  # Нормированный параметр
+        result = y_vals[center_idx]
+        product = 1
+
+        for k in range(1, n):
+            # Определяем множитель для текущего члена
+            if k % 2 == 1:  # Нечетные порядки
+                term = t - (k // 2)
+                diff_idx = center_idx - (k // 2)
+            else:  # Четные порядки
+                term = t + (k // 2 - 1)
+                diff_idx = center_idx - (k // 2)
+
+            product *= term / k
+
+            # Проверяем границы массива разностей
+            if k >= len(diff_table) or diff_idx < 0 or diff_idx >= len(diff_table[k]):
+                break
+
+            result += product * diff_table[k][diff_idx]
+
+        y_interp.append(result)
+
+    return y_interp
 
 def start():
     global root, input_frame, frame_plot, result_text, add_column_button

@@ -33,10 +33,13 @@ def read_xy_console():
             print("Ошибка: все значения должны быть числами. Попробуйте снова.")
 
 def process_output(x_vals, y_vals, result):
+    arg = result["arg"]
     output = ""
     output += result['Таблица конечных разностей'] + "\n"
     output += f"Ньютон({arg}) = {result['Интерполяция Ньютона']}\n"
     output += f"Лагранж({arg}) = {result['Интерполяция Лагранжа']}\n"
+    output += f"Гаусс({arg}) = {result['Интерполяция Гаусса']}\n"
+
 
     print("\nРезультат:\n", output)
 
