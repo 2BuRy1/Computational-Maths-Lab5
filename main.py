@@ -32,6 +32,7 @@ def read_xy_console():
         except ValueError:
             print("Ошибка: все значения должны быть числами. Попробуйте снова.")
 
+
 def process_output(x_vals, y_vals, result):
     arg = result["arg"]
     output = ""
@@ -39,6 +40,8 @@ def process_output(x_vals, y_vals, result):
     output += f"Ньютон({arg}) = {result['Интерполяция Ньютона']}\n"
     output += f"Лагранж({arg}) = {result['Интерполяция Лагранжа']}\n"
     output += f"Гаусс({arg}) = {result['Интерполяция Гаусса']}\n"
+
+
 
 
     print("\nРезультат:\n", output)
@@ -154,17 +157,8 @@ def main():
     while True:
         method = file_reader.get_input_method()
         if method == "1":
-            while True:
-                try:
-                    x_vals, y_vals, arg = file_reader.read_input_from_file()
-                    result = solve(x_vals, y_vals, arg)
-                    process_output(x_vals, y_vals, result)
-                    break
-                except Exception as e:
-                    print(f"Ошибка файла: {e}")
-        elif method == "2":
             console_input()
-        elif method == "3":
+        elif method == "2":
             process_function_mode()
 
 if __name__ == "__main__":

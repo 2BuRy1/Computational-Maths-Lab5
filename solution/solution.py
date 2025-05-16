@@ -9,6 +9,7 @@ def newton_divided_interp(x, div_diff_table, arg):
         product *= (arg - x[i - 1])
         result += div_diff_table[i][0] * product
     return result
+# y0 + f(x0, x1) * (x - x0) + f(x0, x1, x2) * (x - x0) * (x - x1) ...
 
 
 def divided_differences(x, y):
@@ -50,42 +51,35 @@ def solve(x, y, arg):
 
     def gauss_interpolation(x, y, arg):
         n = len(x)
-        if n < 2:
-            raise ValueError("Need at least 2 points for interpolation")
-
         h = x[1] - x[0]
-
         center_idx = n // 2
-
-        fin_diffs = finite_differences(y)
-
-        dts = [0, -1, 1, -2, 2, -3, 3, -4, 4, -5, 5]
-
         t = (arg - x[center_idx]) / h
 
+        # Вычисление конечных разностей
+        fin_diff = [y.copy()]
+        for i in range(1, n):
+            fin_diff.append([fin_diff[i - 1][j + 1] - fin_diff[i - 1][j]
+                             for j in range(n - i)])
+
         result = y[center_idx]
+        product = 1
 
         for k in range(1, n):
-            product = 1
-            for j in range(k):
-                product *= (t + dts[j])
-
-            base_idx = center_idx - (k // 2)
-
-
-            if arg <= x[center_idx] and k % 2 == 0:
-                diff_idx = base_idx - 1
+            # Выбор узлов для разностей
+            if k % 2 == 1:
+                idx = center_idx - (k // 2 + 1)
             else:
-                diff_idx = base_idx
+                idx = center_idx - (k // 2)
 
-            if diff_idx < 0 or diff_idx >= len(fin_diffs[k]):
+            if idx < 0 or idx >= len(fin_diff[k]):
                 break
 
-            delta = fin_diffs[k][diff_idx]
-            term = product * delta / math.factorial(k)
-            result += term
+            product *= (t + (-1) ** (k % 2) * (k // 2)) / k
+            result += product * fin_diff[k][idx]
 
         return result
+
+    # arg < x[center> ? second ->
 
     def lagrange_interpolation(x, y, arg):
         n = len(x)
@@ -97,6 +91,8 @@ def solve(x, y, arg):
                     term *= (arg - x[j]) / (x[i] - x[j])
             result += term
         return result
+
+
 
     lagrange_val = lagrange_interpolation(x_sorted, y_sorted, arg)
     new_table = divided_differences(x_sorted, y_sorted)

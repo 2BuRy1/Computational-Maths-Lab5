@@ -1,11 +1,16 @@
 import math
 import tkinter as tk
 from random import random
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from solution.solution import solve, newton_divided_interp, divided_differences
+
+
+global root
+root = None
+
 
 x_values = []
 y_values = []
@@ -18,6 +23,13 @@ FUNCTIONS = {
     "Линейная": lambda x: 2 * x + 3,
     "Синус": lambda x: math.sin(x),
 }
+
+
+def update_result_text(content):
+    result_text.delete("1.0", tk.END)
+    result_text.insert("1.0", content)
+
+
 
 def plot_function(x_vals, y_vals, result, arg, master_frame, func_name=None):
     for w in master_frame.winfo_children():
@@ -33,18 +45,13 @@ def plot_function(x_vals, y_vals, result, arg, master_frame, func_name=None):
 
     y_interp = newton_divided_poly(result['x_sorted'], result['y_sorted'], x_dense)
 
-    y_gaus = lagrange_poly(result['x_sorted'], result['y_sorted'] ,x_dense)
+    y_gaus = lagrange_poly(result['x_sorted'], result['y_sorted'], x_dense)
 
-
-
+    y_lagrange = gauss_poly(result['x_sorted'], result['y_sorted'],result['diff_table'] ,x_dense)
 
     ax.plot(x_dense, y_interp, label='Полином Ньютона', color='red', linewidth=2)
     ax.plot(x_dense, y_gaus, label='Полином Гаусса', color='green', linestyle='--', linewidth=2)
-
-
-
-
-
+    ax.plot(x_dense, y_gaus, label='Полином Лагранжа', color='yellow', linewidth=2)
     if func_name and func_name in FUNCTIONS:
         f = FUNCTIONS[func_name]
         y_true = [f(x) for x in x_dense]
@@ -56,6 +63,7 @@ def plot_function(x_vals, y_vals, result, arg, master_frame, func_name=None):
     canvas.draw()
     canvas.get_tk_widget().pack(fill="both", expand=True)
     NavigationToolbar2Tk(canvas, master_frame)
+
 
 def add_column_set():
     global column_sets, entries_x, entries_y
@@ -89,6 +97,7 @@ def add_column_set():
     else:
         add_column_button.grid_forget()
 
+
 def show_table_input():
     frame_function_input.pack_forget()
     frame_table_input.pack()
@@ -108,6 +117,7 @@ def show_table_input():
     tk.Label(frame_table_input, text="Аргумент:").grid(row=14, column=0, padx=5, pady=5)
     arg_entry = tk.Entry(frame_table_input, width=10)
     arg_entry.grid(row=14, column=1, padx=5, pady=5)
+
 
 def show_function_input():
     frame_table_input.pack_forget()
@@ -137,6 +147,60 @@ def show_function_input():
     tk.Label(frame_function_input, text="Аргумент:").grid(row=4, column=0)
     arg_entry = tk.Entry(frame_function_input, width=10)
     arg_entry.grid(row=4, column=1)
+
+
+def read_from_file():
+    filepath = filedialog.askopenfilename(
+        title="Выберите файл с данными",
+        filetypes=(("Текстовые файлы", "*.txt"), ("Все файлы", "*.*"))
+    )
+
+    if not filepath:
+        return
+
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            lines = [line.strip() for line in f.readlines() if line.strip()]
+
+        for entry in entries_x + entries_y:
+            entry.delete(0, tk.END)
+        arg_entry.delete(0, tk.END)
+
+        arg_value = None
+        points = []
+
+        for line in lines:
+            if line.lower().startswith('arg'):
+                if arg_value is None:
+                    try:
+                        arg_str = line.split('=')[1].strip().replace(',', '.')
+                        arg_value = float(arg_str)
+                        arg_entry.insert(0, arg_str)
+                    except (IndexError, ValueError):
+                        continue
+                continue
+
+            parts = line.replace(',', '.').split()
+            if len(parts) >= 2:
+                try:
+                    x, y = parts[0], parts[1]
+                    points.append((x, y))
+                except:
+                    continue
+
+        for i, (x, y) in enumerate(points):
+            if i < len(entries_x):
+                entries_x[i].delete(0, tk.END)
+                entries_x[i].insert(0, x)
+                entries_y[i].delete(0, tk.END)
+                entries_y[i].insert(0, y)
+
+        messagebox.showinfo("Успех",
+                            f"Загружено {len(points)} точек\n"
+                            f"Аргумент: {arg_value if arg_value else 'не найден'}")
+
+    except Exception as e:
+        messagebox.showerror("Ошибка", f"Ошибка чтения файла: {str(e)}")
 
 
 def get_input_data():
@@ -191,33 +255,40 @@ def get_input_data():
         x_values = np.linspace(start, end, num, endpoint=True).tolist()
         y_values = [func(x) for x in x_values]
 
-
-
     return x_values, y_values, arg
+
 
 def get_frame_plot():
     return frame_plot
 
+
 def get_input_mode():
     return input_mode
 
+
 def get_func_combobox():
     return func_combobox
+
+
+def get_result():
+    result_text
+
+
 
 def setData():
     data = get_input_data()
     if data[0] is None:
         return
     x_vals, y_vals, arg = data
+
     result = solve(x_vals, y_vals, arg)
     result_text.delete("1.0", tk.END)
     result_text.insert("1.0", result['Таблица конечных разностей'] + "\n")
-    result_text.insert(tk.END, f"Результаты интерполяции:\nНьютон({arg}) = {result['Интерполяция Ньютона']}\nГаусс({arg}) = {result['Интерполяция Гаусса']}\nЛагранж({arg}) = {result['Интерполяция Лагранжа']}")
+    result_text.insert(tk.END,
+                       f"Результаты интерполяции:\nНьютон({arg}) = {result['Интерполяция Ньютона']}\nГаусс({arg}) = {result['Интерполяция Гаусса']}\nЛагранж({arg}) = {result['Интерполяция Лагранжа']}")
 
     func_name = func_combobox.get() if input_mode.get() == "function" else None
     plot_function(x_vals, y_vals, result, arg, frame_plot, func_name)
-
-
 
 
 def lagrange_poly(x_vals, y_vals, x_dense):
@@ -234,6 +305,7 @@ def lagrange_poly(x_vals, y_vals, x_dense):
         y_interp.append(y)
     return y_interp
 
+
 def newton_divided_poly(x, y, x_dense):
     div_table = divided_differences(x, y)
     y_interp = [newton_divided_interp(x, div_table, val) for val in x_dense]
@@ -241,47 +313,73 @@ def newton_divided_poly(x, y, x_dense):
 
 
 def gauss_poly(x_vals, y_vals, diff_table, x_dense):
+    """
+    Вычисляет значения интерполяционного многочлена Гаусса для массива точек
+
+    Args:
+        x_vals: отсортированный список узлов интерполяции по x
+        y_vals: значения функции в узлах интерполяции
+        diff_table: таблица конечных разностей
+        x_dense: массив точек для вычисления значений многочлена
+
+    Returns:
+        список значений многочлена Гаусса для x_dense
+    """
     n = len(x_vals)
     if n < 2:
         return [y_vals[0]] * len(x_dense)
 
+    # Проверка равномерности сетки
     h = x_vals[1] - x_vals[0]
+    for i in range(2, n):
+        if not math.isclose(x_vals[i] - x_vals[i - 1], h, rel_tol=1e-9):
+            raise ValueError("Метод Гаусса требует равномерную сетку")
 
-
-    center_idx = n // 2
+    # Вычисляем значения многочлена Гаусса для каждой точки
     y_interp = []
 
     for x in x_dense:
-        t = (x - x_vals[center_idx]) / h  # Нормированный параметр
-        result = y_vals[center_idx]
-        product = 1
+        # Находим ближайший узел (центральный)
+        center_idx = min(range(n), key=lambda i: abs(x_vals[i] - x))
+
+        # Решаем, использовать ли первую или вторую формулу Гаусса
+        if x > x_vals[-1] or (center_idx < n - 1 and x > (x_vals[center_idx] + x_vals[center_idx + 1]) / 2):
+            # Первая формула Гаусса (вперед)
+            center = center_idx
+        else:
+            # Вторая формула Гаусса (назад)
+            center = min(center_idx, n - 1)
+
+        # Вычисляем параметр t
+        t = (x - x_vals[center]) / h
+
+        # Вычисляем значение в точке x
+        result = y_vals[center]
+        term = 1.0
 
         for k in range(1, n):
-            # Определяем множитель для текущего члена
-            if k % 2 == 1:  # Нечетные порядки
-                term = t - (k // 2)
-                diff_idx = center_idx - (k // 2)
-            else:  # Четные порядки
-                term = t + (k // 2 - 1)
-                diff_idx = center_idx - (k // 2)
-
-            product *= term / k
-
-            # Проверяем границы массива разностей
-            if k >= len(diff_table) or diff_idx < 0 or diff_idx >= len(diff_table[k]):
-                break
-
-            result += product * diff_table[k][diff_idx]
+            if k % 2 == 1:  # Нечетные разности
+                m = k // 2
+                term *= (t - m) / k
+                if center - m >= 0 and center - m < len(diff_table[k]):
+                    result += term * diff_table[k][center - m]
+            else:  # Четные разности
+                m = k // 2
+                term *= (t + m) / k
+                if center - m >= 0 and center - m < len(diff_table[k]):
+                    result += term * diff_table[k][center - m]
 
         y_interp.append(result)
 
     return y_interp
 
+
 def start():
-    global root, input_frame, frame_plot, result_text, add_column_button
+
+    global input_frame, frame_plot, result_text, add_column_button
     global func_combobox, start_entry, end_entry, points_entry, arg_entry, input_mode
     global frame_table_input, frame_function_input
-
+    global root
     root = tk.Tk()
     root.title("Интерполяция")
     root.geometry("1000x700")
@@ -290,8 +388,10 @@ def start():
 
     mode_frame = tk.Frame(root)
     mode_frame.pack(pady=10)
-    tk.Radiobutton(mode_frame, text="Табличный ввод", variable=input_mode, value="table", command=show_table_input).pack(side=tk.LEFT, padx=5)
-    tk.Radiobutton(mode_frame, text="Функция", variable=input_mode, value="function", command=show_function_input).pack(side=tk.LEFT, padx=5)
+    tk.Radiobutton(mode_frame, text="Табличный ввод", variable=input_mode, value="table",
+                   command=show_table_input).pack(side=tk.LEFT, padx=5)
+    tk.Radiobutton(mode_frame, text="Функция", variable=input_mode, value="function", command=show_function_input).pack(
+        side=tk.LEFT, padx=5)
 
     input_frame = tk.Frame(root)
     input_frame.pack(pady=5)
@@ -308,8 +408,12 @@ def start():
     frame_controls = tk.Frame(root)
     frame_controls.pack(pady=10)
 
+    # Добавляем кнопку для чтения из файла
+    file_button = tk.Button(frame_controls, text="Прочитать из файла", command=read_from_file)
+    file_button.pack(side=tk.LEFT, padx=5)
+
     solve_button = tk.Button(frame_controls, text="Построить график", command=setData)
-    solve_button.pack()
+    solve_button.pack(side=tk.LEFT, padx=5)
 
     result_text = tk.Text(frame_controls, height=10, width=80, wrap="word")
     result_text.pack()
