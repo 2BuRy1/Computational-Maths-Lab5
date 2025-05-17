@@ -9,8 +9,8 @@ from solution.solution import solve, newton_divided_interp, divided_differences
 
 
 global root
+global file_button
 root = None
-
 
 x_values = []
 y_values = []
@@ -30,7 +30,6 @@ def update_result_text(content):
     result_text.insert("1.0", content)
 
 
-
 def plot_function(x_vals, y_vals, result, arg, master_frame, func_name=None):
     for w in master_frame.winfo_children():
         w.destroy()
@@ -44,14 +43,13 @@ def plot_function(x_vals, y_vals, result, arg, master_frame, func_name=None):
     x_dense = [x_vals[0] + i * (x_vals[-1] - x_vals[0]) / 500 for i in range(501)]
 
     y_interp = newton_divided_poly(result['x_sorted'], result['y_sorted'], x_dense)
-
     y_gaus = lagrange_poly(result['x_sorted'], result['y_sorted'], x_dense)
-
-    y_lagrange = gauss_poly(result['x_sorted'], result['y_sorted'],result['diff_table'] ,x_dense)
+    y_lagrange = gauss_poly(result['x_sorted'], result['y_sorted'], result['diff_table'], x_dense)
 
     ax.plot(x_dense, y_interp, label='Полином Ньютона', color='red', linewidth=2)
     ax.plot(x_dense, y_gaus, label='Полином Гаусса', color='green', linestyle='--', linewidth=2)
     ax.plot(x_dense, y_gaus, label='Полином Лагранжа', color='yellow', linewidth=2)
+
     if func_name and func_name in FUNCTIONS:
         f = FUNCTIONS[func_name]
         y_true = [f(x) for x in x_dense]
@@ -118,6 +116,8 @@ def show_table_input():
     arg_entry = tk.Entry(frame_table_input, width=10)
     arg_entry.grid(row=14, column=1, padx=5, pady=5)
 
+    file_button.pack(side=tk.LEFT, padx=5)  # Показываем кнопку в табличном режиме
+
 
 def show_function_input():
     frame_table_input.pack_forget()
@@ -147,6 +147,8 @@ def show_function_input():
     tk.Label(frame_function_input, text="Аргумент:").grid(row=4, column=0)
     arg_entry = tk.Entry(frame_function_input, width=10)
     arg_entry.grid(row=4, column=1)
+
+    file_button.pack_forget()  # Скрываем кнопку в режиме функции
 
 
 def read_from_file():
@@ -251,7 +253,6 @@ def get_input_data():
             return None, None, None
 
         func = FUNCTIONS[func_name]
-
         x_values = np.linspace(start, end, num, endpoint=True).tolist()
         y_values = [func(x) for x in x_values]
 
@@ -271,8 +272,7 @@ def get_func_combobox():
 
 
 def get_result():
-    result_text
-
+    return result_text
 
 
 def setData():
@@ -285,7 +285,9 @@ def setData():
     result_text.delete("1.0", tk.END)
     result_text.insert("1.0", result['Таблица конечных разностей'] + "\n")
     result_text.insert(tk.END,
-                       f"Результаты интерполяции:\nНьютон({arg}) = {result['Интерполяция Ньютона']}\nГаусс({arg}) = {result['Интерполяция Гаусса']}\nЛагранж({arg}) = {result['Интерполяция Лагранжа']}")
+                       f"Результаты интерполяции:\nНьютон({arg}) = {result['Интерполяция Ньютона']}\n"
+                       f"Гаусс({arg}) = {result['Интерполяция Гаусса']}\n"
+                       f"Лагранж({arg}) = {result['Интерполяция Лагранжа']}")
 
     func_name = func_combobox.get() if input_mode.get() == "function" else None
     plot_function(x_vals, y_vals, result, arg, frame_plot, func_name)
@@ -313,57 +315,35 @@ def newton_divided_poly(x, y, x_dense):
 
 
 def gauss_poly(x_vals, y_vals, diff_table, x_dense):
-    """
-    Вычисляет значения интерполяционного многочлена Гаусса для массива точек
-
-    Args:
-        x_vals: отсортированный список узлов интерполяции по x
-        y_vals: значения функции в узлах интерполяции
-        diff_table: таблица конечных разностей
-        x_dense: массив точек для вычисления значений многочлена
-
-    Returns:
-        список значений многочлена Гаусса для x_dense
-    """
     n = len(x_vals)
     if n < 2:
         return [y_vals[0]] * len(x_dense)
 
-    # Проверка равномерности сетки
     h = x_vals[1] - x_vals[0]
     for i in range(2, n):
         if not math.isclose(x_vals[i] - x_vals[i - 1], h, rel_tol=1e-9):
             raise ValueError("Метод Гаусса требует равномерную сетку")
 
-    # Вычисляем значения многочлена Гаусса для каждой точки
     y_interp = []
-
     for x in x_dense:
-        # Находим ближайший узел (центральный)
         center_idx = min(range(n), key=lambda i: abs(x_vals[i] - x))
 
-        # Решаем, использовать ли первую или вторую формулу Гаусса
         if x > x_vals[-1] or (center_idx < n - 1 and x > (x_vals[center_idx] + x_vals[center_idx + 1]) / 2):
-            # Первая формула Гаусса (вперед)
             center = center_idx
         else:
-            # Вторая формула Гаусса (назад)
             center = min(center_idx, n - 1)
 
-        # Вычисляем параметр t
         t = (x - x_vals[center]) / h
-
-        # Вычисляем значение в точке x
         result = y_vals[center]
         term = 1.0
 
         for k in range(1, n):
-            if k % 2 == 1:  # Нечетные разности
+            if k % 2 == 1:
                 m = k // 2
                 term *= (t - m) / k
                 if center - m >= 0 and center - m < len(diff_table[k]):
                     result += term * diff_table[k][center - m]
-            else:  # Четные разности
+            else:
                 m = k // 2
                 term *= (t + m) / k
                 if center - m >= 0 and center - m < len(diff_table[k]):
@@ -373,13 +353,12 @@ def gauss_poly(x_vals, y_vals, diff_table, x_dense):
 
     return y_interp
 
-
 def start():
-
     global input_frame, frame_plot, result_text, add_column_button
     global func_combobox, start_entry, end_entry, points_entry, arg_entry, input_mode
     global frame_table_input, frame_function_input
-    global root
+    global root, file_button
+
     root = tk.Tk()
     root.title("Интерполяция")
     root.geometry("1000x700")
@@ -390,14 +369,13 @@ def start():
     mode_frame.pack(pady=10)
     tk.Radiobutton(mode_frame, text="Табличный ввод", variable=input_mode, value="table",
                    command=show_table_input).pack(side=tk.LEFT, padx=5)
-    tk.Radiobutton(mode_frame, text="Функция", variable=input_mode, value="function", command=show_function_input).pack(
-        side=tk.LEFT, padx=5)
+    tk.Radiobutton(mode_frame, text="Функция", variable=input_mode, value="function",
+                   command=show_function_input).pack(side=tk.LEFT, padx=5)
 
     input_frame = tk.Frame(root)
     input_frame.pack(pady=5)
 
     frame_table_input = tk.Frame(input_frame)
-    frame_table_input.pack()
     frame_function_input = tk.Frame(input_frame)
 
     func_combobox = ttk.Combobox(frame_function_input, values=list(FUNCTIONS.keys()), state="readonly")
@@ -408,12 +386,11 @@ def start():
     frame_controls = tk.Frame(root)
     frame_controls.pack(pady=10)
 
-    # Добавляем кнопку для чтения из файла
     file_button = tk.Button(frame_controls, text="Прочитать из файла", command=read_from_file)
-    file_button.pack(side=tk.LEFT, padx=5)
-
     solve_button = tk.Button(frame_controls, text="Построить график", command=setData)
-    solve_button.pack(side=tk.LEFT, padx=5)
+
+    file_button.pack(side=tk.LEFT, padx=5)   # сначала "Прочитать из файла"
+    solve_button.pack(side=tk.LEFT, padx=5)  # потом "Построить график"
 
     result_text = tk.Text(frame_controls, height=10, width=80, wrap="word")
     result_text.pack()
@@ -422,4 +399,5 @@ def start():
     frame_plot.pack(pady=5, fill="both", expand=True)
 
     show_table_input()
+
     root.mainloop()
