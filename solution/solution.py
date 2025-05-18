@@ -12,6 +12,18 @@ def newton_divided_interp(x, div_diff_table, arg):
 # y0 + f(x0, x1) * (x - x0) + f(x0, x1, x2) * (x - x0) * (x - x1) ...
 
 
+
+def build_central_diff_table(y):
+    n = len(y)
+    table = [y.copy()]
+    for i in range(1, n):
+        row = []
+        for j in range(n - i):
+            row.append(table[i - 1][j + 1] - table[i - 1][j])
+        table.append(row)
+    return table
+
+
 def divided_differences(x, y):
     n = len(x)
     table = [y.copy()]
@@ -49,33 +61,54 @@ def solve(x, y, arg):
 
     diff_table = finite_differences(y_sorted)
 
-    def gauss_interpolation(x, y, arg):
+    def gauss_interpolation(x, y, arg, formula_type='first'):
         n = len(x)
         h = x[1] - x[0]
-        center_idx = n // 2
-        t = (arg - x[center_idx]) / h
 
-        # Вычисление конечных разностей
         fin_diff = [y.copy()]
         for i in range(1, n):
             fin_diff.append([fin_diff[i - 1][j + 1] - fin_diff[i - 1][j]
                              for j in range(n - i)])
 
-        result = y[center_idx]
-        product = 1
+        if formula_type == 'first':
+            center_idx = n // 2
+            t = (arg - x[center_idx]) / h
+            result = y[center_idx]
+            product = 1
 
-        for k in range(1, n):
-            # Выбор узлов для разностей
-            if k % 2 == 1:
-                idx = center_idx - (k // 2 + 1)
-            else:
-                idx = center_idx - (k // 2)
+            for k in range(1, n):
+                # idx смещается влево и вправо чередующимися шагами
+                if k % 2 == 1:
+                    idx = center_idx - (k // 2 + 1)
+                else:
+                    idx = center_idx - (k // 2)
 
-            if idx < 0 or idx >= len(fin_diff[k]):
-                break
+                if idx < 0 or idx >= len(fin_diff[k]):
+                    break
 
-            product *= (t + (-1) ** (k % 2) * (k // 2)) / k
-            result += product * fin_diff[k][idx]
+                product *= (t + (-1) ** (k % 2) * (k // 2)) / k
+                result += product * fin_diff[k][idx]
+
+        elif formula_type == 'second':
+            center_idx = n // 2 - 1
+            t = (arg - x[center_idx]) / h
+            result = y[center_idx]
+            product = 1
+
+            for k in range(1, n):
+                if k % 2 == 1:
+                    idx = center_idx - (k // 2)
+                else:
+                    idx = center_idx - (k // 2)
+
+                if idx < 0 or idx >= len(fin_diff[k]):
+                    break
+
+                product *= (t - (-1) ** (k % 2) * (k // 2)) / k
+                result += product * fin_diff[k][idx]
+
+        else:
+            raise ValueError("formula_type must be 'first' or 'second'")
 
         return result
 
@@ -107,12 +140,15 @@ def solve(x, y, arg):
             formatted.append(" ".join(formatted_row))
         return "\n".join(formatted)
 
+    central_diff_table = build_central_diff_table(y_sorted)
+
     return {
         "Таблица конечных разностей": format_diff_table(diff_table),
         "Интерполяция Ньютона": newton_val,
         "Интерполяция Гаусса": gauss_val,
         "Интерполяция Лагранжа": lagrange_val,
         "diff_table": diff_table,
+        "central_diff_table": central_diff_table,
         "x_sorted": x_sorted,
         "y_sorted": y_sorted,
         "arg": arg

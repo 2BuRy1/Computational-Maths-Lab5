@@ -43,12 +43,11 @@ def plot_function(x_vals, y_vals, result, arg, master_frame, func_name=None):
     x_dense = [x_vals[0] + i * (x_vals[-1] - x_vals[0]) / 500 for i in range(501)]
 
     y_interp = newton_divided_poly(result['x_sorted'], result['y_sorted'], x_dense)
-    y_gaus = lagrange_poly(result['x_sorted'], result['y_sorted'], x_dense)
-    y_lagrange = gauss_poly(result['x_sorted'], result['y_sorted'], result['diff_table'], x_dense)
-
+    y_lagrange = lagrange_poly(result['x_sorted'], result['y_sorted'], x_dense)
+    y_gaus = gauss_poly_int(result['x_sorted'], result['y_sorted'],  x_dense)
     ax.plot(x_dense, y_interp, label='Полином Ньютона', color='red', linewidth=2)
     ax.plot(x_dense, y_gaus, label='Полином Гаусса', color='green', linestyle='--', linewidth=2)
-    ax.plot(x_dense, y_gaus, label='Полином Лагранжа', color='yellow', linewidth=2)
+    ax.plot(x_dense, y_lagrange, label='Полином Лагранжа', color='yellow', linewidth=2)
 
     if func_name and func_name in FUNCTIONS:
         f = FUNCTIONS[func_name]
@@ -314,45 +313,82 @@ def newton_divided_poly(x, y, x_dense):
     return y_interp
 
 
-def gauss_poly(x_vals, y_vals, diff_table, x_dense):
+def gauss_poly_int(x_vals, y_vals, x_dense):
     n = len(x_vals)
-    if n < 2:
-        return [y_vals[0]] * len(x_dense)
-
     h = x_vals[1] - x_vals[0]
-    for i in range(2, n):
-        if not math.isclose(x_vals[i] - x_vals[i - 1], h, rel_tol=1e-9):
-            raise ValueError("Метод Гаусса требует равномерную сетку")
 
-    y_interp = []
-    for x in x_dense:
-        center_idx = min(range(n), key=lambda i: abs(x_vals[i] - x))
+    m = n // 2
 
-        if x > x_vals[-1] or (center_idx < n - 1 and x > (x_vals[center_idx] + x_vals[center_idx + 1]) / 2):
-            center = center_idx
-        else:
-            center = min(center_idx, n - 1)
+    def divided_differences(x, y):
+        n = len(x)
+        table = [y.copy()]
+        for i in range(1, n):
+            row = []
+            for j in range(n - i):
+                num = table[i - 1][j + 1] - table[i - 1][j]
+                den = x[j + i] - x[j]
+                row.append(num / den)
+            table.append(row)
+        return table
 
-        t = (x - x_vals[center]) / h
-        result = y_vals[center]
-        term = 1.0
 
+    x_centered = [(x - x_vals[m]) / h for x in x_vals]
+    div_table = divided_differences(x_centered, y_vals)
+
+    def evaluate(x):
+        t = (x - x_vals[m]) / h
+        result = div_table[0][0]
+        term = 1
+        for i in range(1, n):
+            term *= (t - x_centered[i - 1])
+            result += div_table[i][0] * term
+        return result
+
+    return [evaluate(x) for x in x_dense]
+
+
+
+
+
+def gauss_poly(x_vals, y_vals, x_dense):
+    n = len(x_vals)
+    h = x_vals[1] - x_vals[0]
+    m = n // 2
+
+    def build_central_diff_table(y):
+        table = [y.copy()]
+        for i in range(1, n):
+            prev = table[i - 1]
+            table.append([prev[j + 1] - prev[j] for j in range(len(prev) - 1)])
+        return table
+
+    delta_table = build_central_diff_table(y_vals)
+
+    def evaluate(x):
+        t = (x - x_vals[m]) / h
+        result = y_vals[m]
+        term = 1
+        j = 1
         for k in range(1, n):
             if k % 2 == 1:
-                m = k // 2
-                term *= (t - m) / k
-                if center - m >= 0 and center - m < len(diff_table[k]):
-                    result += term * diff_table[k][center - m]
+                idx = m - j
             else:
-                m = k // 2
-                term *= (t + m) / k
-                if center - m >= 0 and center - m < len(diff_table[k]):
-                    result += term * diff_table[k][center - m]
+                idx = m - j + 1
 
-        y_interp.append(result)
+            if idx < 0 or idx >= len(delta_table[k]):
+                break
 
-    return y_interp
+            if k % 2 == 1:
+                term *= (t - (j - 1))
+            else:
+                term *= (t + (j - 1))
+                j += 1
 
+            result += term * delta_table[k][idx] / math.factorial(k)
+
+        return result
+
+    return [evaluate(x) for x in x_dense]
 def start():
     global input_frame, frame_plot, result_text, add_column_button
     global func_combobox, start_entry, end_entry, points_entry, arg_entry, input_mode
@@ -389,8 +425,8 @@ def start():
     file_button = tk.Button(frame_controls, text="Прочитать из файла", command=read_from_file)
     solve_button = tk.Button(frame_controls, text="Построить график", command=setData)
 
-    file_button.pack(side=tk.LEFT, padx=5)   # сначала "Прочитать из файла"
-    solve_button.pack(side=tk.LEFT, padx=5)  # потом "Построить график"
+    file_button.pack(side=tk.LEFT, padx=5)
+    solve_button.pack(side=tk.LEFT, padx=5)
 
     result_text = tk.Text(frame_controls, height=10, width=80, wrap="word")
     result_text.pack()
