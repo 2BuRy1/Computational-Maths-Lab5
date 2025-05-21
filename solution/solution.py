@@ -41,6 +41,8 @@ def solve(x, y, arg):
         raise ValueError("Количество x и y значений должно совпадать")
     if len(x) < 2:
         raise ValueError("Нужно как минимум 2 точки для интерполяции")
+    if len(set(x)) != len(x):
+        raise ValueError("Значения x должны быть уникальными (нет повторов)")
 
     points = sorted(zip(x, y), key=lambda p: p[0])
     x_sorted = [p[0] for p in points]

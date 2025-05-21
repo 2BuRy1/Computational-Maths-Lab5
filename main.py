@@ -32,7 +32,6 @@ def read_xy_console():
         except ValueError:
             print("Ошибка: все значения должны быть числами. Попробуйте снова.")
 
-
 def process_output(x_vals, y_vals, result):
     arg = result["arg"]
     output = ""
@@ -41,10 +40,15 @@ def process_output(x_vals, y_vals, result):
     output += f"Лагранж({arg}) = {result['Интерполяция Лагранжа']}\n"
     output += f"Гаусс({arg}) = {result['Интерполяция Гаусса']}\n"
 
-
-
-
     print("\nРезультат:\n", output)
+
+    # Добавляем вывод в текстовое поле GUI
+    from gui_manager.gui_manager import get_result
+    try:
+        get_result().delete("1.0", "end")
+        get_result().insert("1.0", output)
+    except Exception as e:
+        print(f"GUI вывод не удался: {e}")
 
     plot_function(
         x_vals, y_vals, result, arg,
@@ -83,7 +87,7 @@ def process_console_solution():
             global arg
             while True:
                 try:
-                    arg = float(input("Введите аргумент для интерполяции: "))
+                    arg = float(input("Введите аргумент для интерполяции: ").replace(",", "."))
                     break
                 except ValueError as e:
                     print(f"Ошибка: {e}")
@@ -111,7 +115,7 @@ def process_function_mode():
     while True:
         try:
             start_val = input("Начало интервала: ").strip()
-            start = float(start_val)
+            start = float(start_val.replace(",", "."))
             break
         except ValueError:
             print(f"Ошибка: '{start_val}' не является числом.")
@@ -119,7 +123,7 @@ def process_function_mode():
     while True:
         try:
             end_val = input("Конец интервала: ").strip()
-            end = float(end_val)
+            end = float(end_val.replace(",", "."))
             if end <= start:
                 print("Ошибка: конец должен быть больше начала.")
                 continue
